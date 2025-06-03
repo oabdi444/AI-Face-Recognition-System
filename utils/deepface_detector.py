@@ -1,102 +1,90 @@
-import cv2
+# utils/deepface_detector.py
+
 import numpy as np
-from PIL import Image
-import os
 from deepface import DeepFace
-import pandas as pd
+from deepface.commons import functions
+from PIL import Image
+
 
 class DeepFaceDetector:
     def __init__(self):
-        self.models = ["VGG-Face", "Facenet", "OpenFace", "DeepFace"]
-        self.current_model = "VGG-Face"  # Default model
-        
-    def detect_faces(self, image):
-        """Detect faces using DeepFace"""
-        try:
-            # Convert PIL to numpy array
-            if isinstance(image, Image.Image):
-                img_array = np.array(image)
-            else:
-                img_array = image
-                
-            # DeepFace detect
-            faces = DeepFace.extract_faces(img_array, detector_backend='opencv')
-            return faces
-        except Exception as e:
-            print(f"Face detection error: {e}")
-            return []
-    
-    def recognize_faces(self, image, database_path="data/people"):
-        """Recognize faces using DeepFace"""
+        self.model_name = "VGG-Face"
+        self.detector_backend = "opencv"
+        self.db_path = "models/known_faces"
+
+    def recognize_faces(self, image):
+        """
+        Recognize faces in the given image using DeepFace's analyze.
+        Returns a list of dicts with name, confidence, and bounding box.
+        """
+        results = []
+
         try:
             if isinstance(image, Image.Image):
-                img_array = np.array(image)
-            else:
-                img_array = image
-            
-            # Find faces in database
-            results = DeepFace.find(
-                img_path=img_array,
-                db_path=database_path,
-                model_name=self.current_model,
-                distance_metric="cosine",
-                enforce_detection=False
+                image = np.array(image)
+
+            detections = DeepFace.analyze(
+                img_path=image,
+                actions=['identity'],
+                enforce_detection=False,
+                detector_backend=self.detector_backend,
+                model_name=self.model_name,
+                prog_bar=False
             )
-            
-            recognition_results = []
-            
-            if isinstance(results, list) and len(results) > 0:
-                for result_df in results:
-                    if not result_df.empty:
-                        # Get the best match
-                        best_match = result_df.iloc[0]
-                        identity = best_match['identity']
-                        distance = best_match[f'{self.current_model}_cosine']
-                        
-                        # Extract person name from path
-                        person_name = os.path.basename(os.path.dirname(identity))
-                        confidence = max(0, 1 - distance)  # Convert distance to confidence
-                        
-                        recognition_results.append({
-                            'name': person_name,
-                            'confidence': confidence,
-                            'distance': distance
-                        })
-            
-            return recognition_results
-            
+
+            if isinstance(detections, dict):
+                detections = [detections]
+
+            for det in detections:
+                name = det.get("identity", "Unknown")
+                confidence = 1.0 - det.get("distance", 0.4)
+                region = det.get("region", {})
+                box = (
+                    region.get("x", 0),
+                    region.get("y", 0),
+                    region.get("w", 0),
+                    region.get("h", 0)
+                )
+                results.append({
+                    "name": name.split("/")[-1].split(".")[0] if name != "Unknown" else "Unknown",
+                    "confidence": confidence,
+                    "box": box
+                })
+
         except Exception as e:
-            print(f"Recognition error: {e}")
-            return []
-    
-    def verify_faces(self, img1, img2):
-        """Verify if two images contain the same person"""
-        try:
-            result = DeepFace.verify(
-                img1_path=img1,
-                img2_path=img2,
-                model_name=self.current_model,
-                distance_metric="cosine"
-            )
-            return result
-        except Exception as e:
-            print(f"Verification error: {e}")
-            return None
-    
-    def analyze_face(self, image):
-        """Analyze face for age, gender, emotion, race"""
+            print("Recognition error:", str(e))
+
+        return results
+
+    def get_face_embedding(self, image):
+        """
+        Extract and return a face embedding from the image using DeepFace.
+        This embedding can be stored in the database for future matching.
+        """
         try:
             if isinstance(image, Image.Image):
-                img_array = np.array(image)
-            else:
-                img_array = image
-                
-            analysis = DeepFace.analyze(
-                img_path=img_array,
-                actions=['age', 'gender', 'race', 'emotion'],
-                enforce_detection=False
+                image = np.array(image)
+
+            face_objs = functions.extract_faces(
+                img=image,
+                target_size=(224, 224),
+                detector_backend=self.detector_backend,
+                enforce_detection=True,
+                align=True
             )
-            return analysis
+
+            if face_objs and len(face_objs) > 0:
+                face_img, _ = face_objs[0]
+                embedding = DeepFace.represent(
+                    img_path=face_img,
+                    model_name=self.model_name,
+                    enforce_detection=False,
+                    detector_backend=self.detector_backend
+                )[0]["embedding"]
+
+                return np.array(embedding)
+
         except Exception as e:
-            print(f"Analysis error: {e}")
-            return None
+            print("Error processing image:", str(e))
+
+        return None
