@@ -1,0 +1,248 @@
+import streamlit as st
+# import cv2  # Uncomment and ensure 'opencv-python' is installed if using OpenCV functionality in the future
+# import face_recognition  # Removed unused import to prevent errors; ensure face_recognition is installed and imported in modules that require its functionality
+import numpy as np
+from PIL import Image
+import os
+import pickle
+import pandas as pd
+from utils.database import FaceDatabase
+from utils.deepface_detector import DeepFaceDetector
+
+# Page configuration
+st.set_page_config(
+    page_title="AI Face Recognition App",
+    page_icon="👤",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .section-header {
+        font-size: 1.5rem;
+        color: #ff7f0e;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    .success-box {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    .error-box {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+class FaceRecognitionApp:
+    def __init__(self):
+        self.face_detector = DeepFaceDetector()  # Changed here
+        self.database = FaceDatabase()
+        
+    def run(self):
+        st.markdown('<h1 class="main-header">🎯 AI Face Recognition System</h1>', unsafe_allow_html=True)
+        
+        # Sidebar
+        st.sidebar.title("Navigation")
+        page = st.sidebar.selectbox(
+            "Choose a function:",
+            ["Face Recognition", "Add New Person", "Manage Database", "About"]
+        )
+        
+        if page == "Face Recognition":
+            self.face_recognition_page()
+        elif page == "Add New Person":
+            self.add_person_page()
+        elif page == "Manage Database":
+            self.manage_database_page()
+        elif page == "About":
+            self.about_page()
+    
+    def face_recognition_page(self):
+        st.markdown('<h2 class="section-header">🔍 Face Recognition</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.subheader("Upload Image")
+            uploaded_file = st.file_uploader(
+                "Choose an image file",
+                type=['jpg', 'jpeg', 'png'],
+                help="Upload an image containing faces to recognize"
+            )
+            
+            if uploaded_file is not None:
+                # Display uploaded image
+                image = Image.open(uploaded_file)
+                st.image(image, caption="Uploaded Image", use_column_width=True)
+                
+                # Process button
+                if st.button("🔍 Recognize Faces", type="primary"):
+                    with st.spinner("Processing image..."):
+                        results = self.face_detector.recognize_faces(image)
+                        
+                        if results:
+                            st.success(f"Found {len(results)} face(s)!")
+                            
+                            with col2:
+                                st.subheader("Recognition Results")
+                                for i, result in enumerate(results):
+                                    st.write(f"**Face {i+1}:**")
+                                    st.write(f"- Name: {result['name']}")
+                                    st.write(f"- Confidence: {result['confidence']:.2%}")
+                                    st.write("---")
+                        else:
+                            st.error("No faces detected in the image.")
+        
+        with col2:
+            st.subheader("Live Camera Feed")
+            if st.button("📷 Start Camera Recognition"):
+                self.camera_recognition()
+    
+    def add_person_page(self):
+        st.markdown('<h2 class="section-header">➕ Add New Person</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.subheader("Person Information")
+            name = st.text_input("Enter person's name:", placeholder="John Doe")
+            
+            st.subheader("Upload Photos")
+            uploaded_files = st.file_uploader(
+                "Choose image files",
+                type=['jpg', 'jpeg', 'png'],
+                accept_multiple_files=True,
+                help="Upload multiple clear photos of the person's face"
+            )
+            
+            if uploaded_files and name:
+                st.write(f"Selected {len(uploaded_files)} image(s)")
+                
+                # Display preview of uploaded images
+                cols = st.columns(min(len(uploaded_files), 3))
+                for i, file in enumerate(uploaded_files[:3]):
+                    with cols[i % 3]:
+                        image = Image.open(file)
+                        st.image(image, caption=f"Photo {i+1}", use_column_width=True)
+                
+                if st.button("💾 Add Person to Database", type="primary"):
+                    with st.spinner("Processing and saving..."):
+                        success = self.database.add_person(name, uploaded_files)
+                        
+                        if success:
+                            st.markdown(
+                                f'<div class="success-box">✅ Successfully added {name} to the database!</div>',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(
+                                '<div class="error-box">❌ Failed to add person. Please ensure faces are clearly visible.</div>',
+                                unsafe_allow_html=True
+                            )
+        
+        with col2:
+            st.subheader("Tips for Best Results")
+            st.info("""
+            📌 **For optimal face recognition:**
+            
+            • Upload 3-5 clear photos of the person  
+            • Ensure good lighting in photos  
+            • Face should be clearly visible and unobstructed  
+            • Include photos from different angles  
+            • Avoid blurry or low-quality images  
+            • One person per photo works best
+            """)
+    
+    def manage_database_page(self):
+        st.markdown('<h2 class="section-header">🗄️ Manage Database</h2>', unsafe_allow_html=True)
+        
+        # Load current database
+        people = self.database.get_all_people()
+        
+        if people:
+            st.subheader(f"Database contains {len(people)} person(s)")
+            
+            # Display people in database
+            df = pd.DataFrame(list(people.items()), columns=['Name', 'Encodings Count'])
+            df['Encodings Count'] = df['Encodings Count'].apply(len)
+            st.dataframe(df, use_container_width=True)
+            
+            # Delete person
+            st.subheader("Remove Person")
+            person_to_delete = st.selectbox("Select person to remove:", list(people.keys()))
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("🗑️ Delete", type="secondary"):
+                    if self.database.remove_person(person_to_delete):
+                        st.success(f"Removed {person_to_delete} from database")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Failed to remove person")
+            
+            with col2:
+                if st.button("🔄 Clear All Data", type="secondary"):
+                    if st.confirm("Are you sure you want to clear all data?"):
+                        self.database.clear_database()
+                        st.success("Database cleared!")
+                        st.experimental_rerun()
+        else:
+            st.info("Database is empty. Add some people first!")
+    
+    def about_page(self):
+        st.markdown('<h2 class="section-header">ℹ️ About This App</h2>', unsafe_allow_html=True)
+        
+        st.markdown("""
+        ## 🎯 AI Face Recognition System
+        
+        This application uses advanced machine learning algorithms to recognize faces in images and video streams.
+        
+        ### 🔧 Features:
+        - **Face Detection**: Automatically detect faces in uploaded images  
+        - **Face Recognition**: Identify known persons from your database  
+        - **Person Management**: Add new people and manage your face database  
+        - **Real-time Recognition**: Live camera feed recognition (if available)  
+        - **Multiple Photo Training**: Add multiple photos per person for better accuracy
+        
+        ### 🛠️ Technology Stack:
+        - **Streamlit**: Web application framework  
+        - **OpenCV**: Computer vision library  
+        - **face_recognition**: Face recognition library built on dlib  
+        - **NumPy**: Numerical computing  
+        - **Pillow**: Image processing
+        
+        ### 📝 How to Use:
+        1. **Add People**: Upload clear photos of people you want to recognize  
+        2. **Recognition**: Upload images to identify faces  
+        3. **Manage**: View and manage your face database
+        
+        ### ⚠️ Privacy Note:
+        All face data is stored locally on your device. No data is sent to external servers.
+        """)
+    
+    def camera_recognition(self):
+        """Handle camera-based face recognition"""
+        st.info("Camera recognition feature - implement based on your camera setup")
+        # This would implement real-time camera recognition
+        # Implementation depends on deployment environment
+
+# Initialize and run the app
+if __name__ == "__main__":
+    app = FaceRecognitionApp()
+    app.run()
