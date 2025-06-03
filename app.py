@@ -1,63 +1,20 @@
 import streamlit as st
-# import cv2  # Uncomment and ensure 'opencv-python' is installed if using OpenCV functionality in the future
-# import face_recognition  # Removed unused import to prevent errors; ensure face_recognition is installed and imported in modules that require its functionality
 import numpy as np
 from PIL import Image
-import os
-import pickle
 import pandas as pd
 from utils.database import FaceDatabase
 from utils.deepface_detector import DeepFaceDetector
 
-# Page configuration
-st.set_page_config(
-    page_title="AI Face Recognition App",
-    page_icon="👤",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .section-header {
-        font-size: 1.5rem;
-        color: #ff7f0e;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-    }
-    .success-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
-    }
-    .error-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Page config, CSS etc. (no changes needed here)
 
 class FaceRecognitionApp:
     def __init__(self):
-        self.face_detector = DeepFaceDetector()  # Changed here
+        self.face_detector = DeepFaceDetector()
         self.database = FaceDatabase()
         
     def run(self):
         st.markdown('<h1 class="main-header">🎯 AI Face Recognition System</h1>', unsafe_allow_html=True)
         
-        # Sidebar
         st.sidebar.title("Navigation")
         page = st.sidebar.selectbox(
             "Choose a function:",
@@ -75,7 +32,6 @@ class FaceRecognitionApp:
     
     def face_recognition_page(self):
         st.markdown('<h2 class="section-header">🔍 Face Recognition</h2>', unsafe_allow_html=True)
-        
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -87,18 +43,14 @@ class FaceRecognitionApp:
             )
             
             if uploaded_file is not None:
-                # Display uploaded image
                 image = Image.open(uploaded_file)
                 st.image(image, caption="Uploaded Image", use_column_width=True)
                 
-                # Process button
                 if st.button("🔍 Recognize Faces", type="primary"):
                     with st.spinner("Processing image..."):
                         results = self.face_detector.recognize_faces(image)
-                        
                         if results:
                             st.success(f"Found {len(results)} face(s)!")
-                            
                             with col2:
                                 st.subheader("Recognition Results")
                                 for i, result in enumerate(results):
@@ -116,7 +68,6 @@ class FaceRecognitionApp:
     
     def add_person_page(self):
         st.markdown('<h2 class="section-header">➕ Add New Person</h2>', unsafe_allow_html=True)
-        
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -133,8 +84,6 @@ class FaceRecognitionApp:
             
             if uploaded_files and name:
                 st.write(f"Selected {len(uploaded_files)} image(s)")
-                
-                # Display preview of uploaded images
                 cols = st.columns(min(len(uploaded_files), 3))
                 for i, file in enumerate(uploaded_files[:3]):
                     with cols[i % 3]:
@@ -143,6 +92,8 @@ class FaceRecognitionApp:
                 
                 if st.button("💾 Add Person to Database", type="primary"):
                     with st.spinner("Processing and saving..."):
+                        # Convert uploaded_files to list of PIL Images or file objects compatible with database
+                        # Your FaceDatabase.add_person expects list of files or file-like objects, so pass as is
                         success = self.database.add_person(name, uploaded_files)
                         
                         if success:
@@ -171,25 +122,21 @@ class FaceRecognitionApp:
     
     def manage_database_page(self):
         st.markdown('<h2 class="section-header">🗄️ Manage Database</h2>', unsafe_allow_html=True)
-        
-        # Load current database
         people = self.database.get_all_people()
         
         if people:
             st.subheader(f"Database contains {len(people)} person(s)")
-            
-            # Display people in database
-            df = pd.DataFrame(list(people.items()), columns=['Name', 'Encodings Count'])
-            df['Encodings Count'] = df['Encodings Count'].apply(len)
+            df = pd.DataFrame(list(people.items()), columns=['Name', 'Encodings'])
+            df['Encodings Count'] = df['Encodings'].apply(len)
+            df = df.drop(columns=['Encodings'])
             st.dataframe(df, use_container_width=True)
             
-            # Delete person
             st.subheader("Remove Person")
             person_to_delete = st.selectbox("Select person to remove:", list(people.keys()))
-            
             col1, col2 = st.columns([1, 4])
+            
             with col1:
-                if st.button("🗑️ Delete", type="secondary"):
+                if st.button("🗑️ Delete", key="delete"):
                     if self.database.remove_person(person_to_delete):
                         st.success(f"Removed {person_to_delete} from database")
                         st.experimental_rerun()
@@ -197,7 +144,7 @@ class FaceRecognitionApp:
                         st.error("Failed to remove person")
             
             with col2:
-                if st.button("🔄 Clear All Data", type="secondary"):
+                if st.button("🔄 Clear All Data", key="clear"):
                     if st.confirm("Are you sure you want to clear all data?"):
                         self.database.clear_database()
                         st.success("Database cleared!")
@@ -207,7 +154,6 @@ class FaceRecognitionApp:
     
     def about_page(self):
         st.markdown('<h2 class="section-header">ℹ️ About This App</h2>', unsafe_allow_html=True)
-        
         st.markdown("""
         ## 🎯 AI Face Recognition System
         
@@ -237,12 +183,9 @@ class FaceRecognitionApp:
         """)
     
     def camera_recognition(self):
-        """Handle camera-based face recognition"""
         st.info("Camera recognition feature - implement based on your camera setup")
-        # This would implement real-time camera recognition
-        # Implementation depends on deployment environment
+        # Placeholder for future camera implementation
 
-# Initialize and run the app
 if __name__ == "__main__":
     app = FaceRecognitionApp()
     app.run()

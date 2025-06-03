@@ -37,7 +37,8 @@ class DeepFaceDetector:
 
             for det in detections:
                 name = det.get("identity", "Unknown")
-                confidence = 1.0 - det.get("distance", 0.4)
+                # DeepFace does not provide distance in analyze, so fix confidence logic:
+                confidence = det.get("confidence", 0.0) if "confidence" in det else 1.0
                 region = det.get("region", {})
                 box = (
                     region.get("x", 0),
@@ -65,6 +66,7 @@ class DeepFaceDetector:
             if isinstance(image, Image.Image):
                 image = np.array(image)
 
+            # Extract faces using DeepFace's extract_faces function
             face_objs = functions.extract_faces(
                 img=image,
                 target_size=(224, 224),
@@ -75,16 +77,20 @@ class DeepFaceDetector:
 
             if face_objs and len(face_objs) > 0:
                 face_img, _ = face_objs[0]
-                embedding = DeepFace.represent(
+                # Use DeepFace.represent to get the embedding vector
+                reps = DeepFace.represent(
                     img_path=face_img,
                     model_name=self.model_name,
                     enforce_detection=False,
                     detector_backend=self.detector_backend
-                )[0]["embedding"]
-
-                return np.array(embedding)
+                )
+                if reps and isinstance(reps, list):
+                    embedding = reps[0].get("embedding", None)
+                    if embedding is not None:
+                        return np.array(embedding)
 
         except Exception as e:
             print("Error processing image:", str(e))
 
         return None
+
