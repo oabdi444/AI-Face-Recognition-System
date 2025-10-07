@@ -5,7 +5,6 @@ import pandas as pd
 from utils.database import FaceDatabase
 from utils.deepface_detector import DeepFaceDetector
 
-# Page config, CSS etc. (no changes needed here)
 
 class FaceRecognitionApp:
     def __init__(self):
@@ -13,7 +12,7 @@ class FaceRecognitionApp:
         self.database = FaceDatabase()
         
     def run(self):
-        st.markdown('<h1 class="main-header">🎯 AI Face Recognition System</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="main-header"> AI Face Recognition System</h1>', unsafe_allow_html=True)
         
         st.sidebar.title("Navigation")
         page = st.sidebar.selectbox(
@@ -31,7 +30,7 @@ class FaceRecognitionApp:
             self.about_page()
     
     def face_recognition_page(self):
-        st.markdown('<h2 class="section-header">🔍 Face Recognition</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header"> Face Recognition</h2>', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -46,7 +45,7 @@ class FaceRecognitionApp:
                 image = Image.open(uploaded_file)
                 st.image(image, caption="Uploaded Image", use_column_width=True)
                 
-                if st.button("🔍 Recognize Faces", type="primary"):
+                if st.button(" Recognize Faces", type="primary"):
                     with st.spinner("Processing image..."):
                         results = self.face_detector.recognize_faces(image)
                         if results:
@@ -63,7 +62,7 @@ class FaceRecognitionApp:
         
         with col2:
             st.subheader("Live Camera Feed")
-            if st.button("📷 Start Camera Recognition"):
+            if st.button(" Start Camera Recognition"):
                 self.camera_recognition()
     
     def add_person_page(self):
@@ -90,7 +89,7 @@ class FaceRecognitionApp:
                         image = Image.open(file)
                         st.image(image, caption=f"Photo {i+1}", use_column_width=True)
                 
-                if st.button("💾 Add Person to Database", type="primary"):
+                if st.button(" Add Person to Database", type="primary"):
                     with st.spinner("Processing and saving..."):
                         # Convert uploaded_files to list of PIL Images or file objects compatible with database
                         # Your FaceDatabase.add_person expects list of files or file-like objects, so pass as is
@@ -98,19 +97,19 @@ class FaceRecognitionApp:
                         
                         if success:
                             st.markdown(
-                                f'<div class="success-box">✅ Successfully added {name} to the database!</div>',
+                                f'<div class="success-box"> Successfully added {name} to the database!</div>',
                                 unsafe_allow_html=True
                             )
                         else:
                             st.markdown(
-                                '<div class="error-box">❌ Failed to add person. Please ensure faces are clearly visible.</div>',
+                                '<div class="error-box"> Failed to add person. Please ensure faces are clearly visible.</div>',
                                 unsafe_allow_html=True
                             )
         
         with col2:
             st.subheader("Tips for Best Results")
             st.info("""
-            📌 **For optimal face recognition:**
+             **For optimal face recognition:**
             
             • Upload 3-5 clear photos of the person  
             • Ensure good lighting in photos  
@@ -121,7 +120,7 @@ class FaceRecognitionApp:
             """)
     
     def manage_database_page(self):
-        st.markdown('<h2 class="section-header">🗄️ Manage Database</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header"> Manage Database</h2>', unsafe_allow_html=True)
         people = self.database.get_all_people()
         
         if people:
@@ -144,7 +143,7 @@ class FaceRecognitionApp:
                         st.error("Failed to remove person")
             
             with col2:
-                if st.button("🔄 Clear All Data", key="clear"):
+                if st.button(" Clear All Data", key="clear"):
                     if st.confirm("Are you sure you want to clear all data?"):
                         self.database.clear_database()
                         st.success("Database cleared!")
@@ -153,34 +152,10 @@ class FaceRecognitionApp:
             st.info("Database is empty. Add some people first!")
     
     def about_page(self):
-        st.markdown('<h2 class="section-header">ℹ️ About This App</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header"> About This App</h2>', unsafe_allow_html=True)
         st.markdown("""
-        ## 🎯 AI Face Recognition System
+        ##  AI Face Recognition System
         
-        This application uses advanced machine learning algorithms to recognize faces in images and video streams.
-        
-        ### 🔧 Features:
-        - **Face Detection**: Automatically detect faces in uploaded images  
-        - **Face Recognition**: Identify known persons from your database  
-        - **Person Management**: Add new people and manage your face database  
-        - **Real-time Recognition**: Live camera feed recognition (if available)  
-        - **Multiple Photo Training**: Add multiple photos per person for better accuracy
-        
-        ### 🛠️ Technology Stack:
-        - **Streamlit**: Web application framework  
-        - **OpenCV**: Computer vision library  
-        - **face_recognition**: Face recognition library built on dlib  
-        - **NumPy**: Numerical computing  
-        - **Pillow**: Image processing
-        
-        ### 📝 How to Use:
-        1. **Add People**: Upload clear photos of people you want to recognize  
-        2. **Recognition**: Upload images to identify faces  
-        3. **Manage**: View and manage your face database
-        
-        ### ⚠️ Privacy Note:
-        All face data is stored locally on your device. No data is sent to external servers.
-        """)
     
     def camera_recognition(self):
         st.info("Camera recognition feature - implement based on your camera setup")
